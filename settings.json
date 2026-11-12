@@ -1,0 +1,17 @@
+{
+  "defaultProvider": "opencode-go",
+  "defaultModel": "deepseek-v4.1-flash",
+  "defaultThinkingLevel": "medium",
+  "packages": [
+    "npm:pi-subagents@0.87.0"
+  ],
+  "subagents": {
+    "defaultModel": "deepseek-v4.1-flash",
+    "agentOverrides": {
+      "reviewer": { "model": "opencode-go/deepseek-v4.1-flash" },
+      "verifier": { "model": "opencode-go/deepseek-v4.1-flash" },
+      "programmer": { "model": "commandcode/deepseek/deepseek-v4.1-flash" },
+      "oracle": { "model": "opencode-go/glm-5.3-flash" }
+    }
+  }
+}

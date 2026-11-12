@@ -1,0 +1,22 @@
+{
+  "providers": {
+    "commandcode": {
+      "baseUrl": "https://api.commandcode.ai/provider/v1",
+      "api": "openai-completions",
+      "apiKey": "$COMMANDCODE_API_KEY",
+      "models": [
+        {
+          "id": "deepseek/deepseek-v4.1-flash",
+          "contextWindow": 1000000,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0.15,
+            "output": 0.60,
+            "cacheRead": 0.003,
+            "cacheWrite": 0.15
+          }
+        }
+      ]
+    }
+  }
+}

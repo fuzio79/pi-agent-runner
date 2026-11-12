@@ -1,0 +1,85 @@
+name: pi-agent-runner
+services:
+  pi-agent-runner:
+    build:
+      context: ./
+    container_name: pi-agent-runner
+    ports:
+      # Bound to loopback on purpose. Callers inside the Docker network MUST use
+      # the service alias `http://pi-agent-runner:8092` (see README: the host
+      # published port causes a hairpin that Docker's userland proxy blackholes).
+      # The port therefore exists only for host-side debugging, and publishing it
+      # on 0.0.0.0 would expose an unauthenticated remote-command-execution
+      # surface to the whole LAN for no benefit.
+      - "127.0.0.1:8092:8092"
+    environment:
+      # Pi's provider config (models.json, settings.json,
+      # provider-fallback.json, extensions/) is baked into the pi-sandbox
+      # image by pi-sandbox.Dockerfile — this service never reads it, so it
+      # must NOT be mounted or passed here. See the "Where config lives"
+      # section in README.md before "tidying" those files out of the repo.
+      PI_IMAGE: pi-sandbox
+      LLAMA_NETWORK: ${PI_SANDBOX_NETWORK:-pi-sandbox-net}
+      # The ONLY provider key. opencode-go is the sole allowed provider
+      # (see _ALLOWED_PROVIDERS in main.py) and it is a built-in provider in
+      # the pi CLI that reads OPENCODE_API_KEY — the same var as `opencode`.
+      #
+      # OPENROUTER_API_KEY and GROK_API_KEY were removed in v1.1.8 along with
+      # their providers. `:-` keeps an unset secret from becoming the literal
+      # string "${...}"; an empty value is skipped by _env_for_sandbox(), and
+      # main.py logs an error at boot if no key is present at all.
+      OPENCODE_API_KEY: ${OPENCODE_API_KEY:-}
+      # Command Code (GOAT) subscription. A BUILT-IN nothing: declared as a
+      # custom provider in models.json, so it needs its own key variable.
+      COMMANDCODE_API_KEY: ${COMMANDCODE_API_KEY:-}
+      # Used ONLY to clone an allowlisted repo into a session's /workspace.
+      # Read-only scope in this deployment. The clone helper reads it at call
+      # time via a credential helper, so it never lands in .git/config,
+      # `git remote -v`, or a diff.
+      GIT_TOKEN: ${GIT_TOKEN:-}
+      # Comma-separated owner/name. Supplied from a Gitea secret rather than
+      # written here, because this file is mirrored to a PUBLIC GitHub repo
+      # and the values are internal repository names. Empty disables cloning.
+      PI_REPO_ALLOWLIST: ${PI_REPO_ALLOWLIST:-}
+      # Gitea base URL used by the clone path. NOT committed as a literal: the
+      # hostname is deployment detail, and a hardcoded one was published by the
+      # public snapshot. No default - an unset value makes cloning refuse rather
+      # than guess a host.
+      GITEA_BASE_URL: ${GITEA_BASE_URL:-}
+      # Optional CA bundle for the clone. Empty = the image trust store, which is
+      # the normal case. This exists so a deployment behind a private CA that is
+      # NOT baked into the image does not have to disable verification.
+      GIT_CA_FILE: ${GIT_CA_FILE:-}
+    healthcheck:
+      # The image is python:3.12-slim, which has no curl, so probe with python.
+      # `restart: unless-stopped` only recovers a DEAD process, never a live but
+      # broken one — and a wedged Docker socket is exactly that, so without this
+      # the container stays "Up" while every request fails.
+      #
+      # /health uses a 5s client timeout (HEALTH_TIMEOUT_S), so this probe fails
+      # fast instead of hanging. --start-period covers the pi-sandbox adoption
+      # sweep run during startup.
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8092/health', timeout=5)"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - sandbox
+    volumes:
+      # The only mount this service needs: it creates the sandbox containers.
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    labels:
+      - "managed=true"   # can be inspected/debugged via docker-exec tooling
+networks:
+  # Local alias, so this file never names a private network. `name:` is the
+  # real external network the service joins; override it per deployment with
+  # PI_SANDBOX_NETWORK.
+  sandbox:
+    external: true
+    name: ${PI_SANDBOX_NETWORK:-pi-sandbox-net}

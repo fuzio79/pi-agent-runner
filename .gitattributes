@@ -1,0 +1,23 @@
+# Export rules for the public snapshot sync.
+#
+# .gitignore has NO effect on files that are already tracked. These
+# export-ignore rules are what actually keep internal files out of the curated
+# public snapshot, so anything built with `git archive` cannot leak them by
+# accident.
+#
+# Kept out of the public repo:
+#   .gitea/        this instance's CI, useless (and noise) off-site
+#   .github/       does not exist yet; create it local-only once GitHub CI is
+#                  wanted, and delete this line at the same time
+#
+# Everything else IS published, including docker-compose.yml and
+# pi-sandbox.Dockerfile — they are the actual deployment examples.
+.gitea/                        export-ignore
+.github/                       export-ignore
+.gitignore                     export-ignore
+# The internal CA chain. Kept in the repo because pi-sandbox builds with it, but
+# EXCLUDED from the public snapshot: it is a trust anchor for a private namespace
+# and has no meaning off-site. A grep for the hostname cannot see inside a PEM, so
+# excluding it here is the only thing that keeps it out.
+nuc-ca-chain.pem               export-ignore
+.dockerignore                  export-ignore
